@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
       - name: Checkout code
