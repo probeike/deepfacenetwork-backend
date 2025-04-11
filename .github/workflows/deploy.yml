@@ -1,15 +1,17 @@
-name: Deploy resources for deep face network backend
+name: Deploy AI Agent to AWS EKS
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     env:
-        TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+      TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
 
     steps:
       - name: Checkout code
@@ -20,7 +22,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -33,3 +35,33 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
+        
+      # Get Terraform outputs
+      - name: Get Terraform outputs
+        id: terraform-outputs
+        run: |
+          echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
+          echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_ENV
+          echo "API_ID=$(echo $(terraform output -raw api_gateway_endpoint) | cut -d'/' -f3 | cut -d'.' -f1)" >> $GITHUB_ENV
+
+      # Install kubectl
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Run the deployment script
+      - name: Deploy with environment-aware script
+        run: |
+          chmod +x ./deploy.sh
+          ./deploy.sh

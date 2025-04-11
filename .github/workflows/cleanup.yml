@@ -1,0 +1,81 @@
+name: Cleanup AI Agent Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to clean up (dev or prod)'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - prod
+      confirmation:
+        description: 'Type "yes-delete-everything" to confirm deletion of all resources'
+        required: true
+        type: string
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirmation == 'yes-delete-everything' }}
+
+    env:
+      TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+      ENVIRONMENT: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Select Terraform workspace
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "prod" ]; then
+            terraform workspace select prod || terraform workspace new prod
+          else
+            terraform workspace select default
+          fi
+
+      # Get Terraform outputs
+      - name: Get Terraform outputs
+        id: terraform-outputs
+        run: |
+          echo "CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint 2>/dev/null || echo '')" >> $GITHUB_ENV
+          if [ -n "$(terraform output -raw api_gateway_endpoint 2>/dev/null || echo '')" ]; then
+            echo "API_ID=$(echo $(terraform output -raw api_gateway_endpoint) | cut -d'/' -f3 | cut -d'.' -f1)" >> $GITHUB_ENV
+          fi
+
+      # Install kubectl
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      # Run the cleanup script
+      - name: Run cleanup script
+        run: |
+          chmod +x ./cleanup.sh
+          ./cleanup.sh
+
+      # Confirmation of cleanup
+      - name: Cleanup confirmation
+        run: |
+          echo "Cleanup completed successfully!"
+          echo "All resources for the ${{ github.event.inputs.environment }} environment have been removed."
