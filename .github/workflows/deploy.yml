@@ -1,4 +1,4 @@
-name: Deploy S3 Bucket
+name: Deploy resources for deep face network backend
 
 on:
   push:
@@ -26,7 +26,10 @@ jobs:
         uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init
-        run: terraform init -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}"
+        run: terraform init
+
+      - name: Select Terraform workspace
+        run: terraform workspace select prod || terraform workspace new prod
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}"
+        run: terraform apply -auto-approve
