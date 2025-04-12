@@ -1,4 +1,4 @@
-name: Deploy AI Agent to AWS EKS
+name: Deploy S3 Bucket to AWS
 
 on:
   push:
@@ -40,25 +40,7 @@ jobs:
       - name: Get Terraform outputs
         id: terraform-outputs
         run: |
-          echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
-          echo "ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
-          echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_ENV
-          echo "API_ID=$(echo $(terraform output -raw api_gateway_endpoint) | cut -d'/' -f3 | cut -d'.' -f1)" >> $GITHUB_ENV
-
-      # Install kubectl
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
-      # Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      # Login to Amazon ECR
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+          echo "S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)" >> $GITHUB_ENV
 
       # Run the deployment script
       - name: Deploy with environment-aware script
